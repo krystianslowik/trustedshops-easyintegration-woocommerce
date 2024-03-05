@@ -1,0 +1,38 @@
+name: Sync SVN to GitHub
+
+on:
+  schedule:
+    - cron:  '0 * * * *' # Runs every hour, adjust as needed
+  workflow_dispatch: # Allows manual trigger from GitHub UI
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v2
+      
+    - name: Install SVN
+      run: sudo apt-get install subversion -y
+      
+    - name: Get Latest SVN Revision
+      id: svn_revision
+      run: |
+        REPO_URL="https://plugins.svn.wordpress.org/trusted-shops-easy-integration-for-woocommerce/"
+        LATEST_REVISION=$(svn info $REPO_URL | grep '^Revision:' | awk '{print $2}')
+        echo "LATEST_REVISION=$LATEST_REVISION" >> $GITHUB_ENV
+        echo "::set-output name=revision::$LATEST_REVISION"
+      
+    - name: Sync with SVN
+      run: |
+        MIN_REVISION=3008760
+        START_REVISION=$MIN_REVISION
+        if [ "$LATEST_REVISION" -gt "$MIN_REVISION" ]; then
+          START_REVISION=$LATEST_REVISION
+        fi
+        # Setup git svn environment
+        git config --global user.email "you@example.com"
+        git config --global user.name "Your Name"
+        # Perform the rebase operation from the determined revision
+        git svn rebase -r$START_REVISION
+
