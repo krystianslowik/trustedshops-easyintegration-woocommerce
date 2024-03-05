@@ -1,43 +1,34 @@
-name: Sync SVN to GitHub
+name: Sync SVN to GitHub using Docker
 
 on:
   schedule:
-    - cron:  '0 * * * *' # Runs every hour, adjust as needed
-  workflow_dispatch: # Allows manual trigger from GitHub UI
+    - cron: '0 * * * *'  # Runs every hour, adjust as needed
+  workflow_dispatch:  # Allows manual trigger from GitHub UI
 
 jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout repo
-      uses: actions/checkout@v2
+      - name: Checkout repo
+        uses: actions/checkout@v2
       
-    - name: Install dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y subversion git-svn
-
-    - name: Configure Git
-      run: |
-        git config --global user.email "you@example.com"
-        git config --global user.name "Your Name"
-
-    - name: Get Latest SVN Revision
-      id: svn_revision
-      run: |
-        REPO_URL="https://plugins.svn.wordpress.org/trusted-shops-easy-integration-for-woocommerce/"
-        LATEST_REVISION=$(svn info $REPO_URL | grep '^Revision:' | awk '{print $2}')
-        echo "LATEST_REVISION=$LATEST_REVISION" >> $GITHUB_ENV
-        echo "::set-output name=revision::$LATEST_REVISION"
-      
-    - name: Sync with SVN
-      run: |
-        MIN_REVISION=3008760
-        if [ "$LATEST_REVISION" -gt "$MIN_REVISION" ]; then
-          START_REVISION=$LATEST_REVISION
-        else
-          START_REVISION=$MIN_REVISION
-        fi
-        git svn fetch -r$START_REVISION
-        git svn rebase
-
+      - name: Sync with SVN using Docker
+        run: |
+          docker run --rm -v "${{ github.workspace }}:/workspace" ubuntu:latest bash -c "
+            apt-get update &&
+            apt-get install -y subversion git-svn &&
+            git config --global user.email 'you@example.com' &&
+            git config --global user.name 'Your Name' &&
+            cd /workspace &&
+            SVN_REPO='https://plugins.svn.wordpress.org/trusted-shops-easy-integration-for-woocommerce/' &&
+            svn info \$SVN_REPO | grep '^Revision:' | awk '{print \$2}' > LATEST_REVISION &&
+            LATEST_REVISION=\$(cat LATEST_REVISION) &&
+            MIN_REVISION=3008760 &&
+            if [ \"\$LATEST_REVISION\" -gt \"\$MIN_REVISION\" ]; then
+              START_REVISION=\$LATEST_REVISION;
+            else
+              START_REVISION=\$MIN_REVISION;
+            fi &&
+            git svn fetch -r\$START_REVISION &&
+            git svn rebase
+          "
