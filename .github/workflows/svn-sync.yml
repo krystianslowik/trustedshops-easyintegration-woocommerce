@@ -12,8 +12,8 @@ jobs:
     - name: Checkout repo
       uses: actions/checkout@v2
       
-    - name: Install SVN
-      run: sudo apt-get install subversion -y && sudo apt-get install git-svn
+    - name: Install SVN and git-svn
+      run: sudo apt-get update && sudo apt-get install subversion git-svn -y
       
     - name: Get Latest SVN Revision
       id: svn_revision
@@ -35,4 +35,3 @@ jobs:
         git config --global user.name "Your Name"
         # Perform the rebase operation from the determined revision
         git svn rebase -r$START_REVISION
-
