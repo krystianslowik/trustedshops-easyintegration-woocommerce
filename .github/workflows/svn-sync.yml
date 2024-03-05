@@ -19,7 +19,12 @@ jobs:
             apt-get install -y subversion git-svn &&
             git config --global user.email 'you@example.com' &&
             git config --global user.name 'Your Name' &&
+            git config --global --add safe.directory /workspace && # Address ownership issue
             cd /workspace &&
+            if [ ! -d '.git' ]; then
+              echo 'No .git directory. Initializing git svn...'
+              git svn init 'https://plugins.svn.wordpress.org/trusted-shops-easy-integration-for-woocommerce/' --stdlayout
+            fi &&
             SVN_REPO='https://plugins.svn.wordpress.org/trusted-shops-easy-integration-for-woocommerce/' &&
             svn info \$SVN_REPO | grep '^Revision:' | awk '{print \$2}' > LATEST_REVISION &&
             LATEST_REVISION=\$(cat LATEST_REVISION) &&
@@ -29,6 +34,8 @@ jobs:
             else
               START_REVISION=\$MIN_REVISION;
             fi &&
+            echo 'Fetching SVN revisions starting from r'\$START_REVISION'...' &&
             git svn fetch -r\$START_REVISION &&
+            echo 'Rebasing SVN changes...' &&
             git svn rebase
           "
