@@ -12,9 +12,16 @@ jobs:
     - name: Checkout repo
       uses: actions/checkout@v2
       
-    - name: Install SVN and git-svn
-      run: sudo apt-get update && sudo apt-get install subversion git-svn -y
-      
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y subversion git-svn
+
+    - name: Configure Git
+      run: |
+        git config --global user.email "you@example.com"
+        git config --global user.name "Your Name"
+
     - name: Get Latest SVN Revision
       id: svn_revision
       run: |
@@ -26,12 +33,11 @@ jobs:
     - name: Sync with SVN
       run: |
         MIN_REVISION=3008760
-        START_REVISION=$MIN_REVISION
         if [ "$LATEST_REVISION" -gt "$MIN_REVISION" ]; then
           START_REVISION=$LATEST_REVISION
+        else
+          START_REVISION=$MIN_REVISION
         fi
-        # Setup git svn environment
-        git config --global user.email "you@example.com"
-        git config --global user.name "Your Name"
-        # Perform the rebase operation from the determined revision
-        git svn rebase -r$START_REVISION
+        git svn fetch -r$START_REVISION
+        git svn rebase
+
