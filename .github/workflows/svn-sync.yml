@@ -13,7 +13,7 @@ jobs:
       uses: actions/checkout@v2
       
     - name: Install SVN
-      run: sudo apt-get install subversion -y
+      run: sudo apt-get install subversion -y && sudo apt-get install git-svn
       
     - name: Get Latest SVN Revision
       id: svn_revision
