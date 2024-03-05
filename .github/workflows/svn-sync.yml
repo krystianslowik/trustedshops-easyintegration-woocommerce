@@ -11,7 +11,7 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v2
-      
+
       - name: Sync with SVN using Docker
         run: |
           docker run --rm -v "${{ github.workspace }}:/workspace" ubuntu:latest bash -c "
@@ -19,11 +19,19 @@ jobs:
             apt-get install -y subversion git-svn &&
             git config --global user.email 'you@example.com' &&
             git config --global user.name 'Your Name' &&
-            git config --global --add safe.directory /workspace && # Address ownership issue
             cd /workspace &&
-            if [ ! -d '.git' ]; then
-              echo 'No .git directory. Initializing git svn...'
+            if [ ! -d '.git/svn' ]; then
+              echo 'Initializing git svn...'
               git svn init 'https://plugins.svn.wordpress.org/trusted-shops-easy-integration-for-woocommerce/' --stdlayout
+              git config --global --add safe.directory /workspace
+            fi &&
+            echo 'Checking SVN remote configuration...'
+            if git config --get svn-remote.svn.url > /dev/null; then
+              echo 'SVN remote is configured.'
+            else
+              echo 'SVN remote not found. Setting svn-remote.svn.url...'
+              git config svn-remote.svn.url 'https://plugins.svn.wordpress.org/trusted-shops-easy-integration-for-woocommerce/'
+              git config svn-remote.svn.fetch ':refs/remotes/svn/trunk'
             fi &&
             SVN_REPO='https://plugins.svn.wordpress.org/trusted-shops-easy-integration-for-woocommerce/' &&
             svn info \$SVN_REPO | grep '^Revision:' | awk '{print \$2}' > LATEST_REVISION &&
