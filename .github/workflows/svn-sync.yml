@@ -1,49 +1,47 @@
-name: Sync SVN to GitHub using Docker
+name: SVN to Git Sync
 
 on:
   schedule:
-    - cron: '0 * * * *'  # Runs every hour, adjust as needed
-  workflow_dispatch:  # Allows manual trigger from GitHub UI
+    - cron: '0 * * * *' # Adjust as necessary
+  workflow_dispatch:
 
 jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repo
+      - name: Checkout Git repository
         uses: actions/checkout@v2
+        with:
+          fetch-depth: 0 # Fetch all history for all branches and tags
 
-      - name: Sync with SVN using Docker
+      - name: Install SVN and Git-SVN
+        run: sudo apt-get update && sudo apt-get install -y subversion git-svn
+
+      - name: Fetch latest SVN revision
+        id: svnlog
         run: |
-          docker run --rm -v "${{ github.workspace }}:/workspace" ubuntu:latest bash -c "
-            apt-get update &&
-            apt-get install -y subversion git-svn &&
-            git config --global user.email 'you@example.com' &&
-            git config --global user.name 'Your Name' &&
-            cd /workspace &&
-            if [ ! -d '.git/svn' ]; then
-              echo 'Initializing git svn...'
-              git svn init 'https://plugins.svn.wordpress.org/trusted-shops-easy-integration-for-woocommerce/' --stdlayout
-              git config --global --add safe.directory /workspace
-            fi &&
-            echo 'Checking SVN remote configuration...'
-            if git config --get svn-remote.svn.url > /dev/null; then
-              echo 'SVN remote is configured.'
-            else
-              echo 'SVN remote not found. Setting svn-remote.svn.url...'
-              git config svn-remote.svn.url 'https://plugins.svn.wordpress.org/trusted-shops-easy-integration-for-woocommerce/'
-              git config svn-remote.svn.fetch ':refs/remotes/svn/trunk'
-            fi &&
-            SVN_REPO='https://plugins.svn.wordpress.org/trusted-shops-easy-integration-for-woocommerce/' &&
-            svn info \$SVN_REPO | grep '^Revision:' | awk '{print \$2}' > LATEST_REVISION &&
-            LATEST_REVISION=\$(cat LATEST_REVISION) &&
-            MIN_REVISION=3008760 &&
-            if [ \"\$LATEST_REVISION\" -gt \"\$MIN_REVISION\" ]; then
-              START_REVISION=\$LATEST_REVISION;
-            else
-              START_REVISION=\$MIN_REVISION;
-            fi &&
-            echo 'Fetching SVN revisions starting from r'\$START_REVISION'...' &&
-            git svn fetch -r\$START_REVISION &&
-            echo 'Rebasing SVN changes...' &&
-            git svn rebase
-          "
+          LATEST_REVISION=$(svn log https://plugins.svn.wordpress.org/trusted-shops-easy-integration-for-woocommerce/ -l 1 | grep -oP '^r\K\d+')
+          echo "LATEST_REVISION=$LATEST_REVISION" >> $GITHUB_ENV
+          echo "::set-output name=revision::$LATEST_REVISION"
+
+      - name: Clone SVN repository
+        run: git svn clone --no-minimize-url -s -r${{ steps.svnlog.outputs.revision }} https://plugins.svn.wordpress.org/trusted-shops-easy-integration-for-woocommerce/ svn-repo
+
+      - name: Change directory
+        run: cd svn-repo
+
+      - name: Fetch additional SVN data
+        run: git svn fetch --log-window-size=10000
+
+      - name: Rebase SVN changes
+        run: git svn rebase
+
+      - name: Commit changes to Git
+        run: |
+          cd svn-repo
+          git config --global user.email "krystian.slowik@trustedshops.com"
+          git config --global user.name "krystianslowik"
+          git add .
+          git commit -m "Sync SVN changes" || echo "No changes to commit"
+          git push origin main
+
